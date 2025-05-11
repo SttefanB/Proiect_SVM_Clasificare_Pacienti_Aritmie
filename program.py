@@ -2,20 +2,24 @@ import numpy as np
 from sklearn import svm
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.preprocessing import StandardScaler
+from sklearn.feature_selection import SelectKBest, f_classif
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.impute import SimpleImputer
 data=pd.read_csv("arrhythmia.data", header=None, na_values="?")
-data.dropna(inplace=True)
+imputer = SimpleImputer(strategy='mean')  # Inlocuim cu valoarea medie de pe coloana respectivă
+X = imputer.fit_transform(data.iloc[:, :-1])  # înlocuiește NaN-urile cu media coloanei
+Y = data.iloc[:, -1].values
 
-X=data.iloc[:,:-1].values #atributele esantioanelor
-Y=data.iloc[:,-1].values #etichetele esantioanelor
-# 2. Reformulare etichete: 1 -> 0 (normal), 2–16 -> 1 (aritmie)D:\Proiect_Inteligenta_Artificiala
-Y_binary = np.where(Y == 1, 0, 1)
+
+
 #Scalam datele de la intrare, intrucat avem foarte multe esantioane cu eticheta 1 si mai putine cu alte etichete
 scaler=StandardScaler()
 X_scalat=scaler.fit_transform(X)
 #Antrenam modelul SVM
-X_train, X_test, Y_train, Y_test= train_test_split(X_scalat,Y_binary,test_size=0.25, random_state=42) #Impartim in date si etichete 75 % si 25%
+X_train, X_test, Y_train, Y_test= train_test_split(X_scalat,Y,test_size=0.25, random_state=30,stratify=Y) #Impartim in date si etichete 75 % si 25%
 
 #Incercam sa testam pentru diverse valori de cost si gamma
 Cost=[2**-5, 2**-3, 2**-1,1, 2,3,4,5, 2**3, 2**5, 2**7]
@@ -37,3 +41,17 @@ for i in Cost:
             cost_optim=i
             gamm_optim=j
 print("Acuratetea maxima ",max(acuratete),"obtinut pentru costul",cost_optim,"si pentru parametrul gamma",gamm_optim)
+
+svc_optim = svm.SVC(kernel='rbf', C=cost_optim, gamma=gamm_optim, class_weight='balanced')
+svc_optim.fit(X_train, Y_train)
+predictie_optim = svc_optim.predict(X_test)
+cm_optim = confusion_matrix(Y_test, predictie_optim)
+
+plt.figure(figsize=(6, 5))
+sns.heatmap(cm_optim, annot=True, fmt='d', cmap='Blues', 
+            xticklabels=['Normal', 'Aritmie'], 
+            yticklabels=['Normal', 'Aritmie'])
+plt.ylabel('Clasa Reală')
+plt.xlabel('Clasa Prezisă')
+plt.title(f'Matricea de Confuzie (C={cost_optim}, gamma={gamm_optim})')
+plt.show()
